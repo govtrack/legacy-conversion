@@ -149,9 +149,9 @@ for old, new in [ ( "h", "hr" ), ( "hr", "hres" ), ( "hj", "hjres" ), ( "hc", "h
 							print "** New:", '"' + new_element_text + '"'
 							print "** Diff:", text_diff
 
-		bill += 1
-
 		print "Done checking %s%d.\n" % ( new, bill )
+
+		bill += 1
 
 ## XXX: This code will create re-generated XML files that are easier to diff.
 #old_file = etree.parse( "./112/bills/h1000.xml" )
