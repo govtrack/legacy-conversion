@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# python convert_people.py congress-legislators-path legacy-people.xml new-people.xml [0|1]
+# 0 to output all people, 1 to output just people serving in the 113th Congress.
+
+import sys
 import os.path
 from datetime import datetime
 from lxml import etree
@@ -58,10 +62,10 @@ def get_party_abbreviation( party ):
 
 ###
 
-LEGISLATORS_PATH = "../../unitedstates/congress-legislators/"
-
-ORIGINAL_PEOPLE_FILE = "./govtrack/people.xml"
-NEW_PEOPLE_FILE = "./congress/people.xml"
+LEGISLATORS_PATH = sys.argv[1]
+ORIGINAL_PEOPLE_FILE = sys.argv[2]
+NEW_PEOPLE_FILE = sys.argv[3]
+CURRENT_ONLY = (sys.argv[4] == "1")
 
 ###
 
@@ -77,6 +81,7 @@ for e in old_people.findall( "/person" ):
 	govtrack_order.append( e.get( "id" ) )
 
 persons = {}
+new_person_order = []
 
 print "Loading historical legislators..."
 
@@ -84,6 +89,7 @@ for person in yaml_load( LEGISLATORS_PATH + "legislators-historical.yaml" ):
 	govtrack_id = str( person["id"]["govtrack"] )
 	persons[govtrack_id] = person
 	persons[govtrack_id]["social"] = {}
+	if govtrack_id not in govtrack_order: new_person_order.append(govtrack_id)
 
 print "Loading current legislators..."
 
@@ -91,6 +97,7 @@ for person in yaml_load( LEGISLATORS_PATH + "legislators-current.yaml" ):
 	govtrack_id = str( person["id"]["govtrack"] )
 	persons[govtrack_id] = person
 	persons[govtrack_id]["social"] = {}
+	if govtrack_id not in govtrack_order: new_person_order.append(govtrack_id)
 
 print "Loading legislator social media data..."
 
@@ -109,17 +116,21 @@ for person in yaml_load( LEGISLATORS_PATH + "executive.yaml" ):
 	if govtrack_id not in persons:
 		persons[govtrack_id] = person
 		persons[govtrack_id]["social"] = {}
+		if govtrack_id not in govtrack_order: new_person_order.append(govtrack_id)
 	else:
-		# XXX: This just tacks the executives onto the end of the list, which messes with the chronology of people like Andrew Johnson.
+		# Extend the terms, then re-sort to ensure the roles come out in chronological order.
 		persons[govtrack_id]["terms"].extend( person["terms"] )
+		persons[govtrack_id]["terms"].sort(key = lambda n : n["start"]) # sort by term start date
 
 print "Generating XML..."
 
 new_people = etree.Element( "people" )
+if CURRENT_ONLY:
+	new_people.set( "session", "113" ) # this is the last Congress we'll be using this script anyway
 
 new_people.text = "\n\t"
 
-for govtrack_id in govtrack_order:
+for govtrack_id in govtrack_order + new_person_order:
 	if govtrack_id not in persons:
 		continue
 
@@ -200,6 +211,8 @@ for govtrack_id in govtrack_order:
 	person.set( "name", full_name )
 
 	person.text = "\n\t\t"
+	
+	is_current = False
 
 	for term in persons[govtrack_id]["terms"]:
 		role = etree.Element( "role" )
@@ -239,6 +252,7 @@ for govtrack_id in govtrack_order:
 #			role.set( "contactform", str( term["contact_form"] ) )
 
 		if ( datetime.strptime( str( term["end"] ), "%Y-%m-%d" ) > now ) and ( datetime.strptime( str( term["start"] ), "%Y-%m-%d" ) <= now ):
+			
 			role.set( "current", "1" )
 
 			if term["type"] == "prez":
@@ -274,18 +288,23 @@ for govtrack_id in govtrack_order:
 
 		role.tail = "\n\t\t"
 
-		person.append( role )
+		# For the Congress-specific XML, only output roles that intersect with the 113th Congress,
+		# and only output people with such roles.
+		if not CURRENT_ONLY or term["end"] >= "2013-01-04":
+			is_current = True
+			person.append( role )
 
-	person[-1].tail = "\n\t"
-
-	person.tail = "\n\t"
-
-	new_people.append( person )
+	if not CURRENT_ONLY or is_current:
+		person[-1].tail = "\n\t"
+		person.tail = "\n\t"
+		new_people.append( person )
 
 new_people[-1].tail = "\n"
 
 print "Writing XML to file..."
 
-etree.ElementTree( new_people ).write( NEW_PEOPLE_FILE )
+etree.ElementTree( new_people ).write( NEW_PEOPLE_FILE, encoding="utf-8" )
 
 print "Done."
+
+
