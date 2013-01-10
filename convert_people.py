@@ -82,6 +82,7 @@ for e in old_people.findall( "/person" ):
 
 persons = {}
 new_person_order = []
+id_map = { }
 
 print "Loading historical legislators..."
 
@@ -98,11 +99,16 @@ for person in yaml_load( LEGISLATORS_PATH + "legislators-current.yaml" ):
 	persons[govtrack_id] = person
 	persons[govtrack_id]["social"] = {}
 	if govtrack_id not in govtrack_order: new_person_order.append(govtrack_id)
+	for k, v in person["id"].items(): id_map[(k, str(v))] = govtrack_id # map other IDs e.g. ('thomas', '00123') tuples, to govtrack IDs; use str(v) because some values are lists which can't be put into a dict as a key
 
 print "Loading legislator social media data..."
 
 for person_social in yaml_load( LEGISLATORS_PATH + "legislators-social-media.yaml" ):
-	govtrack_id = str( person_social["id"]["govtrack"] )
+	# search for a govtrack ID
+	govtrack_id = None
+	for k, v in person_social["id"].items():
+		if (k, v) in id_map: # kv is e.g. ('thomas', '00123') or even ('govtrack', '412345')
+			govtrack_id = id_map[(k, str(v))]
 	if govtrack_id not in persons:
 		continue
 		#persons[govtrack_id] = person_social
