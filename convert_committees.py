@@ -8,7 +8,6 @@ from lxml import etree
 
 CONGRESS_PATH = sys.argv[1]
 LEGISLATORS_PATH = sys.argv[2]
-#ORIGINAL_PEOPLE_FILE = sys.argv[2]
 NEW_COMMITTEE_FILE = sys.argv[3]
 
 ###
@@ -50,10 +49,7 @@ congress.get_govtrack_person_id = get_govtrack_person_id
 
 print "Loading committee data..."
 
-committees = []
-
-for committee in legislators.yaml_load( LEGISLATORS_PATH + "/committees-current.yaml" ):
-	committees.append( committee )
+committees = legislators.yaml_load( LEGISLATORS_PATH + "/committees-current.yaml" )
 
 print "Loading committee membership data..."
 
@@ -97,7 +93,7 @@ for committee in committees:
 
 			sc.text = "\n\t\t\t"
 
-			for member in members[committee["thomas_id"] + subcommittee["thomas_id"]]:
+			for member in members.get(committee["thomas_id"] + subcommittee["thomas_id"], []):
 				sm = etree.Element( "member" )
 
 				sm.set( "id", congress.get_govtrack_person_id( "bioguide", member["bioguide"] ) )
@@ -109,7 +105,7 @@ for committee in committees:
 
 				sc.append( sm )
 
-			sc[-1].tail = "\n\t\t"
+			if len(sc) > 0: sc[-1].tail = "\n\t\t"
 
 			sc.tail = "\n\t\t"
 
